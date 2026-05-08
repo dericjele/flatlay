@@ -4,6 +4,7 @@ import { useState, useCallback, useRef } from 'react'
 import { ProductImage, CanvasItem, ExportSettings, CanvasDimensions, ShadowMode } from '@/lib/types'
 import { getLayoutPositions } from '@/lib/layouts'
 import { exportCanvas } from '@/lib/canvas'
+import { downscaleImageFile } from '@/lib/image'
 import LeftPanel from './LeftPanel'
 import RightPanel from './RightPanel'
 import FlatLayCanvas from './FlatLayCanvas'
@@ -47,8 +48,9 @@ export default function FlatLayStudio() {
   // ── UPLOAD ──────────────────────────────────────────────────────────────────
   const handleFilesAdded = useCallback(async (files: FileList) => {
     const arr = Array.from(files).filter(f => f.type.startsWith('image/'))
-    for (const file of arr) {
+    for (const original of arr) {
       if (images.length >= 12) break
+      const file = await downscaleImageFile(original)
       const dataUrl = await new Promise<string>(res => {
         const reader = new FileReader()
         reader.onload = e => res(e.target!.result as string)
