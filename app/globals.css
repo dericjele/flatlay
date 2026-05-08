@@ -1,0 +1,41 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:wght@300;600&display=swap');
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --bg: #F4F0EA;
+  --surface: #FDFAF5;
+  --ink: #1A1714;
+  --muted: #7A7066;
+  --accent: #C8502A;
+  --accent2: #4A7C6F;
+  --border: #DDD8CE;
+  --shadow: rgba(26, 23, 20, 0.1);
+  --sel: #2563EB;
+}
+
+html, body {
+  height: 100%;
+  font-family: 'DM Mono', monospace;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+input[type=range] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+select {
+  font-family: 'DM Mono', monospace;
+}
