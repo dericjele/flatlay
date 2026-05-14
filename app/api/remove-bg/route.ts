@@ -40,7 +40,7 @@ async function checkAnonLimit(clientId: string, ipHash: string): Promise<boolean
   return true
 }
 
-async function checkDailyLimit(email: string): Promise<{ allowed: boolean; usedToday: number }> {
+async function checkDailyLimit(email: string): Promise<{ allowed: boolean; usedToday: number; dailyCap: number }> {
   const db = createServiceClient()
   const startOfDay = new Date()
   startOfDay.setHours(0, 0, 0, 0)
