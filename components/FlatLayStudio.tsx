@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { ProductImage, CanvasItem, ExportSettings, CanvasDimensions, ShadowMode } from '@/lib/types'
 import { getLayoutPositions } from '@/lib/layouts'
 import { exportCanvas } from '@/lib/canvas'
@@ -9,8 +9,10 @@ import LeftPanel from './LeftPanel'
 import RightPanel from './RightPanel'
 import FlatLayCanvas from './FlatLayCanvas'
 import ImagePreviewModal from './ImagePreviewModal'
+import SignupModal from './SignupModal'
 
 const DEFAULT_LAYOUT = 'gb-anchor-left'
+const DAILY_CAP = parseInt(process.env.NEXT_PUBLIC_DAILY_BG_LIMIT ?? '10', 10)
 
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((res, rej) => {
@@ -21,9 +23,37 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   })
 }
 
+function getOrCreateClientId(): string {
+  let id = localStorage.getItem('flatlay_cid')
+  if (!id) {
+    id = crypto.randomUUID()
+    localStorage.setItem('flatlay_cid', id)
+  }
+  return id
+}
+
+interface Session { accessToken: string; email: string }
+
 export default function FlatLayStudio() {
   const [images, setImages] = useState<ProductImage[]>([])
   const [items, setItems] = useState<CanvasItem[]>([])
+  const [showSignupModal, setShowSignupModal] = useState(false)
+  const [session, setSession] = useState<Session | null>(null)
+  const [usageToday, setUsageToday] = useState(0)
+  const [devResetDone, setDevResetDone] = useState(false)
+  const pendingBgRef = useRef<string | null>(null)
+
+  // Restore verified session from a prior visit and fetch today's usage count
+  useEffect(() => {
+    const token = localStorage.getItem('flatlay_session')
+    const email = localStorage.getItem('flatlay_email')
+    if (!token || !email) return
+    setSession({ accessToken: token, email })
+    fetch('/api/usage', { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.usedToday !== undefined) setUsageToday(d.usedToday) })
+      .catch(() => {})
+  }, [])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [activeLayout, setActiveLayout] = useState(DEFAULT_LAYOUT)
   const [bgColor, setBgColor] = useState('#FFFFFF')
@@ -100,15 +130,62 @@ export default function FlatLayStudio() {
     setStatus('Removing background…', 'working')
 
     try {
+      // Client-side early checks before making the API call
+      if (session) {
+        if (usageToday >= DAILY_CAP) {
+          setImages(prev => prev.map(x => x.id === id ? { ...x, bgRemoving: false } : x))
+          setStatus(`Daily limit reached (${DAILY_CAP}/${DAILY_CAP}) — comes back tomorrow`, 'idle')
+          return
+        }
+      } else {
+        const anonCount = parseInt(localStorage.getItem('flatlay_anon_count') ?? '0', 10)
+        if (anonCount >= 2) {
+          pendingBgRef.current = id
+          setShowSignupModal(true)
+          setImages(prev => prev.map(x => x.id === id ? { ...x, bgRemoving: false } : x))
+          setStatus('Sign up to remove more backgrounds', 'idle')
+          return
+        }
+      }
+
       const formData = new FormData()
       formData.append('image_file', image.file)
       formData.append('_shadowMode', chosenShadow)
 
-      const res = await fetch('/api/remove-bg', { method: 'POST', body: formData })
+      const clientId = getOrCreateClientId()
+      const headers: Record<string, string> = { 'x-client-id': clientId }
+      if (session) headers['Authorization'] = `Bearer ${session.accessToken}`
+
+      const res = await fetch('/api/remove-bg', { method: 'POST', headers, body: formData })
+
+      if (res.status === 403) {
+        const err = await res.json().catch(() => ({}))
+        if (err.code === 'ANON_LIMIT') {
+          localStorage.setItem('flatlay_anon_count', '2')
+          pendingBgRef.current = id
+          setShowSignupModal(true)
+          setImages(prev => prev.map(x => x.id === id ? { ...x, bgRemoving: false } : x))
+          setStatus('Sign up to remove more backgrounds', 'idle')
+          return
+        }
+        if (err.code === 'DAILY_LIMIT') {
+          setUsageToday(DAILY_CAP)
+          setImages(prev => prev.map(x => x.id === id ? { ...x, bgRemoving: false } : x))
+          setStatus(`Daily limit reached (${DAILY_CAP}/${DAILY_CAP}) — comes back tomorrow`, 'idle')
+          return
+        }
+      }
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
         throw new Error(err.error || `Failed: ${res.status}`)
+      }
+
+      if (session) {
+        setUsageToday(prev => prev + 1)
+      } else {
+        const anonCount = parseInt(localStorage.getItem('flatlay_anon_count') ?? '0', 10)
+        localStorage.setItem('flatlay_anon_count', String(anonCount + 1))
       }
 
       const blob = await res.blob()
@@ -139,7 +216,15 @@ export default function FlatLayStudio() {
       ))
       setStatus(`BG removal failed: ${msg}`, 'idle')
     }
-  }, [images])
+  }, [images, session, usageToday])
+
+  // Auto-retry the pending bg removal once session is established
+  useEffect(() => {
+    if (!session || !pendingBgRef.current) return
+    const id = pendingBgRef.current
+    pendingBgRef.current = null
+    handleRemoveBg(id)
+  }, [session]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── CROP IMAGE — destructive replace, clears bg-removed state ────────────────
   const handleCropImage = useCallback(async (id: string, dataUrl: string) => {
@@ -382,6 +467,29 @@ export default function FlatLayStudio() {
     setSelectedId(null)
   }
 
+  // ── DEV RESET ────────────────────────────────────────────────────────────────
+  const handleDevReset = useCallback(() => {
+    localStorage.removeItem('flatlay_anon_count')
+    localStorage.removeItem('flatlay_cid')
+    localStorage.removeItem('flatlay_session')
+    localStorage.removeItem('flatlay_email')
+    setSession(null)
+    setUsageToday(0)
+    setShowSignupModal(false)
+    setDevResetDone(true)
+    setTimeout(() => setDevResetDone(false), 2000)
+  }, [])
+
+  // ── SIGNUP / VERIFY ─────────────────────────────────────────────────────────
+  const handleVerified = useCallback(({ accessToken, email, usedToday }: { accessToken: string; email: string; usedToday: number }) => {
+    localStorage.setItem('flatlay_session', accessToken)
+    localStorage.setItem('flatlay_email', email)
+    setSession({ accessToken, email })
+    setUsageToday(usedToday)
+    setShowSignupModal(false)
+    setStatus(`Verified ✓ — ${DAILY_CAP - usedToday} BG remove${DAILY_CAP - usedToday !== 1 ? 's' : ''} left today`, 'ok')
+  }, [])
+
   // ── DOWNLOAD ────────────────────────────────────────────────────────────────
   const handleDownload = useCallback(() => {
     if (!hasGenerated) return
@@ -428,8 +536,42 @@ export default function FlatLayStudio() {
         }}>
           Goodie Bag Studio
         </span>
-        <span style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--muted)' }}>
-          First image = hero bag · Drag items · Click to select & edit
+        <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 16 }}>
+          {process.env.NODE_ENV === 'development' && (
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <button
+                onClick={handleDevReset}
+                title="Reset all usage limits and session (dev only)"
+                style={{
+                  fontSize: 9, padding: '3px 8px', borderRadius: 20, cursor: 'pointer',
+                  border: '1px solid #F59E0B', background: '#FEF3C7', color: '#92400E',
+                  fontFamily: "'DM Mono', monospace",
+                }}
+              >
+                ⟳ reset (dev)
+              </button>
+              {devResetDone && (
+                <span style={{
+                  fontSize: 9, color: '#4A7C6F', fontWeight: 600,
+                  animation: 'fadeOut 2s forwards',
+                }}>
+                  ✓ cleared
+                </span>
+              )}
+            </span>
+          )}
+          {session && (
+            <span style={{
+              fontSize: 10, color: usageToday >= DAILY_CAP ? '#DC2626' : '#4A7C6F',
+              padding: '3px 8px', border: `1px solid ${usageToday >= DAILY_CAP ? '#FCA5A5' : '#A8C5BE'}`,
+              borderRadius: 20,
+            }}>
+              {usageToday}/{DAILY_CAP} removes today
+            </span>
+          )}
+          <span style={{ fontSize: 10, color: 'var(--muted)' }}>
+            First image = hero bag · Drag items · Click to select & edit
+          </span>
         </span>
       </header>
 
@@ -509,6 +651,15 @@ export default function FlatLayStudio() {
         </span>
       </div>
 
+      {/* SIGNUP / OTP MODAL */}
+      {showSignupModal && (
+        <SignupModal
+          onClose={() => { setShowSignupModal(false); pendingBgRef.current = null }}
+          onVerified={handleVerified}
+          initialEmail={localStorage.getItem('flatlay_email') ?? undefined}
+        />
+      )}
+
       {/* PREVIEW MODAL */}
       {previewImage && (
         <ImagePreviewModal
@@ -517,6 +668,7 @@ export default function FlatLayStudio() {
           onRemoveBg={(id, shadowMode) => handleRemoveBg(id, shadowMode)}
           onToggleBgRemove={handleToggleBgRemove}
           onCropImage={handleCropImage}
+          limitReached={!!session && usageToday >= DAILY_CAP}
         />
       )}
     </div>

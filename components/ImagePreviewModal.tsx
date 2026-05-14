@@ -10,6 +10,7 @@ interface Props {
   onRemoveBg: (id: string, shadowMode: ShadowMode) => void
   onToggleBgRemove: (id: string) => void
   onCropImage: (id: string, dataUrl: string) => void | Promise<void>
+  limitReached?: boolean
 }
 
 const SHADOW_OPTIONS: { value: ShadowMode; label: string; desc: string }[] = [
@@ -20,7 +21,7 @@ const SHADOW_OPTIONS: { value: ShadowMode; label: string; desc: string }[] = [
 ]
 
 export default function ImagePreviewModal({
-  image, onClose, onRemoveBg, onToggleBgRemove, onCropImage,
+  image, onClose, onRemoveBg, onToggleBgRemove, onCropImage, limitReached = false,
 }: Props) {
   const [shadowMode, setShadowMode] = useState<ShadowMode>(image.shadowMode ?? 'none')
   const [cropOpen, setCropOpen] = useState(false)
@@ -117,22 +118,28 @@ export default function ImagePreviewModal({
               </div>
             </div>
 
-            {/* Remove BG button */}
-            <button
-              onClick={() => onRemoveBg(image.id, shadowMode)}
-              disabled={isProcessing}
-              style={removeBgBtn(isProcessing)}
-            >
-              {isProcessing ? (
-                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                  <span className="modal-spin" style={spinnerStyle} />
-                  {shadowMode !== 'none' ? 'Removing background & adding shadow…' : 'Removing background…'}
-                </span>
-              ) : shadowMode !== 'none'
-                ? `✂  Remove BG + ${SHADOW_OPTIONS.find(o => o.value === shadowMode)?.label}`
-                : '✂  Remove Background'
-              }
-            </button>
+            {/* Remove BG button / limit warning */}
+            {limitReached ? (
+              <div style={limitWarning}>
+                Daily limit reached — come back tomorrow to remove more backgrounds.
+              </div>
+            ) : (
+              <button
+                onClick={() => onRemoveBg(image.id, shadowMode)}
+                disabled={isProcessing}
+                style={removeBgBtn(isProcessing)}
+              >
+                {isProcessing ? (
+                  <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                    <span className="modal-spin" style={spinnerStyle} />
+                    {shadowMode !== 'none' ? 'Removing background & adding shadow…' : 'Removing background…'}
+                  </span>
+                ) : shadowMode !== 'none'
+                  ? `✂  Remove BG + ${SHADOW_OPTIONS.find(o => o.value === shadowMode)?.label}`
+                  : '✂  Remove Background'
+                }
+              </button>
+            )}
 
             {image.bgError && (
               <div style={{ marginTop: 8, padding: '7px 10px', background: '#FEF2F2', borderRadius: 5, fontSize: 10, color: '#DC2626' }}>
@@ -204,19 +211,25 @@ export default function ImagePreviewModal({
                   </button>
                 ))}
               </div>
-              <button
-                onClick={() => onRemoveBg(image.id, shadowMode)}
-                disabled={isProcessing}
-                style={{
-                  width: '100%', padding: '8px', border: '1px solid #DDD8CE',
-                  background: isProcessing ? '#F5F0E8' : '#FDFAF5',
-                  borderRadius: 6, fontFamily: "'DM Mono', monospace",
-                  fontSize: 10, cursor: isProcessing ? 'not-allowed' : 'pointer',
-                  color: '#7A7066', textTransform: 'uppercase', letterSpacing: 0.5,
-                }}
-              >
-                {isProcessing ? '⏳ Processing…' : '↺ Re-process'}
-              </button>
+              {limitReached ? (
+                <div style={limitWarning}>
+                  Daily limit reached — come back tomorrow to re-process.
+                </div>
+              ) : (
+                <button
+                  onClick={() => onRemoveBg(image.id, shadowMode)}
+                  disabled={isProcessing}
+                  style={{
+                    width: '100%', padding: '8px', border: '1px solid #DDD8CE',
+                    background: isProcessing ? '#F5F0E8' : '#FDFAF5',
+                    borderRadius: 6, fontFamily: "'DM Mono', monospace",
+                    fontSize: 10, cursor: isProcessing ? 'not-allowed' : 'pointer',
+                    color: '#7A7066', textTransform: 'uppercase', letterSpacing: 0.5,
+                  }}
+                >
+                  {isProcessing ? '⏳ Processing…' : '↺ Re-process'}
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -317,6 +330,12 @@ function removeBgBtn(disabled: boolean): React.CSSProperties {
     textTransform: 'uppercase', letterSpacing: 1,
     cursor: disabled ? 'not-allowed' : 'pointer', transition: 'background .15s',
   }
+}
+const limitWarning: React.CSSProperties = {
+  width: '100%', padding: '12px 16px', boxSizing: 'border-box',
+  background: '#FEF3C7', border: '1px solid #F59E0B',
+  borderRadius: 8, fontSize: 11, color: '#92400E',
+  textAlign: 'center', lineHeight: 1.5,
 }
 const spinnerStyle: React.CSSProperties = {
   display: 'inline-block', width: 14, height: 14,
