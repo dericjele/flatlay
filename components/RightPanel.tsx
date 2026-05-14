@@ -51,6 +51,7 @@ export default function RightPanel({
   onDownload, hasGenerated,
 }: Props) {
   const [lockAspect, setLockAspect] = useState(true)
+  const [inspectorOpen, setInspectorOpen] = useState(true)
   const [bgTab, setBgTab] = useState<'color' | 'image'>(
     exportSettings.backgroundImageId ? 'image' : 'color'
   )
@@ -80,79 +81,8 @@ export default function RightPanel({
       width: 245, flexShrink: 0, overflow: 'hidden',
     }}>
 
-      {/* ── INSPECTOR ── */}
-      <div style={{ padding: 14, borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
-        <div style={labelStyle}>Inspector</div>
-        {!selectedItem ? (
-          <div style={{ color: 'var(--muted)', fontSize: 10, lineHeight: 1.7, textAlign: 'center', padding: '10px 4px' }}>
-            Click any item to select & edit individually.
-          </div>
-        ) : (
-          <div>
-            {selectedItem.isHero && (
-              <div style={{ background: '#FEF9C3', color: '#92400E', border: '1px solid #FDE68A', fontSize: 9, padding: '4px 8px', borderRadius: 3, textAlign: 'center', marginBottom: 10 }}>
-                ⭐ Hero item (bag)
-              </div>
-            )}
-            <PropSlider label="Scale"    value={Math.round(selectedItem.scale * 100)}                   unit="%" min={15}   max={500} onChange={onScaleChange} />
-            <PropSlider label="Rotation" value={Math.round(selectedItem.rot * 180 / Math.PI)}           unit="°" min={-180} max={180} onChange={onRotChange} />
-            <PropSlider label="Opacity"  value={Math.round(selectedItem.opacity * 100)}                 unit="%" min={20}   max={100} onChange={onOpacityChange} />
-
-            {/* Shadow toggle + intensity */}
-            <div style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 9, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.7, display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                <span>Drop shadow</span>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
-                  <span style={{ fontSize: 9, color: selectedItem.shadow ? 'var(--accent2)' : 'var(--muted)' }}>
-                    {selectedItem.shadow ? 'on' : 'off'}
-                  </span>
-                  <div
-                    onClick={onShadowToggle}
-                    style={{
-                      width: 28, height: 16, borderRadius: 8,
-                      background: selectedItem.shadow ? 'var(--accent2)' : 'var(--border)',
-                      position: 'relative', cursor: 'pointer', transition: 'background .2s',
-                    }}
-                  >
-                    <div style={{
-                      position: 'absolute', top: 2,
-                      left: selectedItem.shadow ? 14 : 2,
-                      width: 12, height: 12, borderRadius: '50%',
-                      background: '#fff', transition: 'left .2s',
-                    }} />
-                  </div>
-                </label>
-              </div>
-              {selectedItem.shadow && (
-                <PropSlider
-                  label="Intensity"
-                  value={Math.round((selectedItem.shadowIntensity ?? 0.5) * 100)}
-                  unit="%"
-                  min={10} max={100}
-                  onChange={onShadowIntensity}
-                />
-              )}
-            </div>
-
-            <div style={{ fontSize: 9, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.7, marginBottom: 6 }}>Actions</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
-              <HBtn onClick={onFlipH}>⇄ Flip H</HBtn>
-              <HBtn onClick={onFlipV}>⇅ Flip V</HBtn>
-              <HBtn onClick={onCenter}>⊕ Center</HBtn>
-              <HBtn onClick={onReset}>↺ Reset</HBtn>
-              <HBtn onClick={onBringForward}>↑ Fwd</HBtn>
-              <HBtn onClick={onSendBack}>↓ Back</HBtn>
-            </div>
-            <button onClick={onDelete} style={{ width: '100%', marginTop: 6, padding: '6px', background: '#FEF2F2', color: '#DC2626', border: '1px solid #FCA5A5', borderRadius: 4, fontFamily: "'DM Mono', monospace", fontSize: 9, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: 0.4 }}>
-              🗑 Remove Item
-            </button>
-          </div>
-        )}
-      </div>
-
-
-      {/* ── EXPORT — pinned bottom ── */}
-      <div style={{ padding: 14, borderTop: '2px solid var(--accent2)', background: 'linear-gradient(to bottom, var(--surface), #F0F7F5)', flexShrink: 0 }}>
+      {/* ── EXPORT — pinned top so Download is always visible ── */}
+      <div style={{ padding: 14, borderBottom: '2px solid var(--accent2)', background: 'linear-gradient(to bottom, #F0F7F5, var(--surface))', flexShrink: 0 }}>
         <div style={{ ...labelStyle, marginBottom: 10 }}>↓ Export</div>
 
         {/* Canvas size */}
@@ -181,7 +111,6 @@ export default function RightPanel({
               borderRadius: 4, cursor: 'pointer', fontSize: 12, lineHeight: 1,
               color: lockAspect ? '#2563EB' : 'var(--muted)',
             }}
-            // title={lockAspect ? 'Lock: proportional resize' : 'Unlocked: resize freely'}
           >
             {lockAspect ? '🔒' : '🔓'}
           </button>
@@ -252,16 +181,13 @@ export default function RightPanel({
             </div>
           </label>
         </div>
+
         {/* Color | Image tabs */}
         <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
-          <button
-            onClick={() => setBgTab('color')}
-            style={tabBtn(bgTab === 'color')}
-          >Color</button>
-          <button
-            onClick={() => setBgTab('image')}
-            style={tabBtn(bgTab === 'image')}
-          >Image{exportSettings.backgroundImageId ? ' ●' : ''}</button>
+          <button onClick={() => setBgTab('color')} style={tabBtn(bgTab === 'color')}>Color</button>
+          <button onClick={() => setBgTab('image')} style={tabBtn(bgTab === 'image')}>
+            Image{exportSettings.backgroundImageId ? ' ●' : ''}
+          </button>
         </div>
 
         {bgTab === 'color' ? (
@@ -280,44 +206,22 @@ export default function RightPanel({
             ) : (
               <>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4, marginBottom: 8 }}>
-                  {/* None tile */}
-                  <button
-                    onClick={() => onSetBackgroundImage(null)}
-                    title="No image background"
-                    style={bgThumbBtn(!exportSettings.backgroundImageId)}
-                  >
+                  <button onClick={() => onSetBackgroundImage(null)} title="No image background" style={bgThumbBtn(!exportSettings.backgroundImageId)}>
                     <span style={{ fontSize: 10, color: 'var(--muted)' }}>None</span>
                   </button>
                   {images.map(img => {
                     const active = exportSettings.backgroundImageId === img.id
                     return (
-                      <button
-                        key={img.id}
-                        onClick={() => onSetBackgroundImage(img.id)}
-                        title="Use as backdrop"
-                        style={bgThumbBtn(active)}
-                      >
-                        <img
-                          src={img.dataUrl}
-                          alt=""
-                          draggable={false}
-                          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', borderRadius: 3 }}
-                        />
+                      <button key={img.id} onClick={() => onSetBackgroundImage(img.id)} title="Use as backdrop" style={bgThumbBtn(active)}>
+                        <img src={img.dataUrl} alt="" draggable={false} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', borderRadius: 3 }} />
                       </button>
                     )
                   })}
                 </div>
-                {/* Fit toggle */}
                 {exportSettings.backgroundImageId && (
                   <div style={{ display: 'flex', gap: 4 }}>
-                    <button
-                      onClick={() => onExportSettingsChange({ ...exportSettings, backgroundFit: 'cover' })}
-                      style={fitBtn(exportSettings.backgroundFit === 'cover')}
-                    >Cover</button>
-                    <button
-                      onClick={() => onExportSettingsChange({ ...exportSettings, backgroundFit: 'contain' })}
-                      style={fitBtn(exportSettings.backgroundFit === 'contain')}
-                    >Contain</button>
+                    <button onClick={() => onExportSettingsChange({ ...exportSettings, backgroundFit: 'cover' })} style={fitBtn(exportSettings.backgroundFit === 'cover')}>Cover</button>
+                    <button onClick={() => onExportSettingsChange({ ...exportSettings, backgroundFit: 'contain' })} style={fitBtn(exportSettings.backgroundFit === 'contain')}>Contain</button>
                   </div>
                 )}
               </>
@@ -344,15 +248,98 @@ export default function RightPanel({
           ↓ Download {canvasDims.w}×{canvasDims.h}px
         </button>
       </div>
-      {/* ── TIPS ── */}
-      <div style={{ padding: 14, borderBottom: '1px solid var(--border)', overflowY: 'auto', flex: 1 }}>
-        <div style={labelStyle}>Composition Tips</div>
-        {TIPS.map((t, i) => (
+
+      {/* ── SCROLLABLE: Inspector + Tips ── */}
+      <div style={{ flex: 1, overflowY: 'auto' }}>
+
+        {/* ── INSPECTOR ── */}
+        <div style={{ borderBottom: '1px solid var(--border)' }}>
+          <button
+            onClick={() => setInspectorOpen(o => !o)}
+            style={{
+              width: '100%', padding: '10px 14px',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              background: 'none', border: 'none', cursor: 'pointer',
+              fontFamily: "'DM Mono', monospace",
+            }}
+          >
+            <span style={{ ...labelStyle, marginBottom: 0 }}>Inspector</span>
+            <span style={{ fontSize: 10, color: 'var(--muted)', transition: 'transform .2s', display: 'inline-block', transform: inspectorOpen ? 'rotate(0deg)' : 'rotate(-90deg)' }}>▾</span>
+          </button>
+          {inspectorOpen && <div style={{ padding: '0 14px 14px' }}>
+            {!selectedItem ? (
+              <div style={{ color: 'var(--muted)', fontSize: 10, lineHeight: 1.7, textAlign: 'center', padding: '10px 4px' }}>
+                Click any item to select & edit individually.
+              </div>
+            ) : (
+              <div>
+                {selectedItem.isHero && (
+                  <div style={{ background: '#FEF9C3', color: '#92400E', border: '1px solid #FDE68A', fontSize: 9, padding: '4px 8px', borderRadius: 3, textAlign: 'center', marginBottom: 10 }}>
+                    ⭐ Hero item (bag)
+                  </div>
+                )}
+                <PropSlider label="Scale"    value={Math.round(selectedItem.scale * 100)}                 unit="%" min={15}   max={500} onChange={onScaleChange} />
+                <PropSlider label="Rotation" value={Math.round(selectedItem.rot * 180 / Math.PI)}         unit="°" min={-180} max={180} onChange={onRotChange} />
+                <PropSlider label="Opacity"  value={Math.round(selectedItem.opacity * 100)}               unit="%" min={20}   max={100} onChange={onOpacityChange} />
+
+                {/* Shadow toggle + intensity */}
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: 9, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.7, display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <span>Drop shadow</span>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
+                      <span style={{ fontSize: 9, color: selectedItem.shadow ? 'var(--accent2)' : 'var(--muted)' }}>
+                        {selectedItem.shadow ? 'on' : 'off'}
+                      </span>
+                      <div
+                        onClick={onShadowToggle}
+                        style={{
+                          width: 28, height: 16, borderRadius: 8,
+                          background: selectedItem.shadow ? 'var(--accent2)' : 'var(--border)',
+                          position: 'relative', cursor: 'pointer', transition: 'background .2s',
+                        }}
+                      >
+                        <div style={{
+                          position: 'absolute', top: 2,
+                          left: selectedItem.shadow ? 14 : 2,
+                          width: 12, height: 12, borderRadius: '50%',
+                          background: '#fff', transition: 'left .2s',
+                        }} />
+                      </div>
+                    </label>
+                  </div>
+                  {selectedItem.shadow && (
+                    <PropSlider label="Intensity" value={Math.round((selectedItem.shadowIntensity ?? 0.5) * 100)} unit="%" min={10} max={100} onChange={onShadowIntensity} />
+                  )}
+                </div>
+
+                <div style={{ fontSize: 9, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.7, marginBottom: 6 }}>Actions</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+                  <HBtn onClick={onFlipH}>⇄ Flip H</HBtn>
+                  <HBtn onClick={onFlipV}>⇅ Flip V</HBtn>
+                  <HBtn onClick={onCenter}>⊕ Center</HBtn>
+                  <HBtn onClick={onReset}>↺ Reset</HBtn>
+                  <HBtn onClick={onBringForward}>↑ Fwd</HBtn>
+                  <HBtn onClick={onSendBack}>↓ Back</HBtn>
+                </div>
+                <button onClick={onDelete} style={{ width: '100%', marginTop: 6, padding: '6px', background: '#FEF2F2', color: '#DC2626', border: '1px solid #FCA5A5', borderRadius: 4, fontFamily: "'DM Mono', monospace", fontSize: 9, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: 0.4 }}>
+                  🗑 Remove Item
+                </button>
+              </div>
+            )}
+          </div>}
+        </div>
+
+        {/* ── TIPS ── */}
+        <div style={{ padding: 14 }}>
+          <div style={labelStyle}>Composition Tips</div>
+          {TIPS.map((t, i) => (
             <div key={i} style={{ marginBottom: 8, fontSize: 9, lineHeight: 1.5, color: 'var(--muted)', paddingLeft: 8, borderLeft: '2px solid var(--border)' }}>
               <strong style={{ color: 'var(--ink)', display: 'block' }}>{t.title}</strong>
               {t.body}
             </div>
-        ))}
+          ))}
+        </div>
+
       </div>
     </div>
   )
